@@ -1,0 +1,122 @@
+<!-- VUE JS 3 -->
+<script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+<!-- SWEETALERT2 (Thông báo đẹp) -->
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<!-- AOS ANIMATION -->
+<script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
+
+<script>
+    const { createApp, ref, onMounted, nextTick } = Vue;
+
+    createApp({
+        setup() {
+            // -- KHAI BÁO BIẾN --
+            const loading = ref(true);
+            const submitting = ref(false);
+            const config = ref({});
+            const benefits = ref([]);
+            const curriculum = ref([]);
+            const instructor = ref([]);
+            const reviews = ref([]);
+            
+            // Biến form đăng ký
+            const form = ref({
+                HoTen: '',
+                SoDienThoai: '',
+                Email: ''
+            });
+
+            // -- CÁC HÀM XỬ LÝ --
+            
+            // 1. Lấy dữ liệu từ Google Sheet
+            const fetchData = () => {
+                google.script.run
+                    .withSuccessHandler((response) => {
+                        config.value = response.config;
+                        benefits.value = response.benefits;
+                        curriculum.value = response.curriculum;
+                        instructor.value = response.instructor;
+                        reviews.value = response.reviews;
+                        
+                        // Cập nhật Tiêu đề trang web
+                        document.title = config.value.Tieu_De_Web || 'Khóa học AppSheet';
+
+                        // Tắt loading và khởi động hiệu ứng trượt (AOS)
+                        setTimeout(() => {
+                            loading.value = false;
+                            nextTick(() => {
+                                AOS.init({ 
+                                    duration: 800, 
+                                    once: true,
+                                    offset: 100
+                                });
+                            });
+                        }, 500);
+                    })
+                    .withFailureHandler((err) => {
+                        loading.value = false;
+                        console.error(err);
+                        Swal.fire('Lỗi', 'Không tải được dữ liệu.', 'error');
+                    })
+                    .getSiteData();
+            };
+
+            // 2. Gửi Form đăng ký
+            const submitForm = () => {
+                submitting.value = true;
+                
+                google.script.run
+                    .withSuccessHandler((res) => {
+                        submitting.value = false;
+                        if(res.success) {
+                            // Thông báo thành công (Giao diện sáng)
+                            Swal.fire({
+                                title: 'Đăng ký thành công!',
+                                text: 'Cảm ơn bạn đã hành động. Chúng tôi sẽ liên hệ sớm nhất.',
+                                icon: 'success',
+                                confirmButtonColor: config.value.Mau_Chu_Dao || '#0F9D58',
+                                confirmButtonText: 'Tuyệt vời'
+                            });
+                            // Xóa trắng form
+                            form.value = { HoTen: '', SoDienThoai: '', Email: '' };
+                        } else {
+                            Swal.fire('Có lỗi', res.message, 'warning');
+                        }
+                    })
+                    .submitRegistration({...form.value});
+            };
+
+            // 3. Format tiền tệ (VND)
+            const formatMoney = (value) => {
+                if(!value) return '0 đ';
+                if(typeof value === 'string' && (value.includes('đ') || value.includes(','))) return value;
+                return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(value);
+            };
+
+            // 4. Cuộn trang mượt mà
+            const scrollTo = (id) => {
+                const el = document.getElementById(id);
+                if(el) el.scrollIntoView({ behavior: 'smooth' });
+            };
+
+            // -- KHI TRANG WEB VỪA MỞ --
+            onMounted(() => {
+                fetchData();
+            });
+
+            return {
+                loading,
+                submitting,
+                config,
+                benefits,
+                curriculum,
+                instructor,
+                reviews,
+                form,
+                submitForm,
+                formatMoney,
+                scrollTo
+            };
+        }
+    }).mount('#app');
+</script>
